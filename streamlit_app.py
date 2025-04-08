@@ -11,8 +11,6 @@ if uploaded_file is not None:
     except pd.errors.EmptyDataError:
         st.error("❌ The uploaded file is empty or unreadable. Please upload a valid CSV file.")
         st.stop()
-
-
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
 
     # Drop completely empty rows/columns
