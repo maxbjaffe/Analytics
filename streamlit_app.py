@@ -7,7 +7,12 @@ st.title("📊 Advertising Performance Dashboard")
 uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 if uploaded_file is not None:    
     # Load and clean the data
+    try:
     df = pd.read_csv(uploaded_file)
+except pd.errors.EmptyDataError:
+    st.error("❌ The uploaded file is empty or unreadable. Please upload a valid CSV file.")
+    st.stop()
+
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
 
     # Drop completely empty rows/columns
