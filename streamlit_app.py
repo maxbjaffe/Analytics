@@ -43,9 +43,6 @@ if uploaded_file is not None:
     df.dropna(how='all', inplace=True)
     df.dropna(axis=1, how='all', inplace=True)
 
-    # Optional: see the cleaned column names
-    # st.write("🧾 Columns:", df.columns.tolist())
-
     # Detect report type
     report_type = detect_report_type(df.columns)
     st.subheader(f"📁 Detected Report Type: `{report_type}`")
@@ -55,8 +52,16 @@ if uploaded_file is not None:
 
     if report_type == "TVQI Report":
         impressions = df['tv_quality_index_measured_impressions'].sum() if 'tv_quality_index_measured_impressions' in df.columns else 0
-        cost = df['advertiser_cost_(adv_currency)'].sum() if 'advertiser_cost_(adv_currency)' in df.columns else 0
         completed_views = df['player_completed_views'].sum() if 'player_completed_views' in df.columns else 0
+
+        # Fix: make sure cost is numeric
+        if 'advertiser_cost_(adv_currency)' in df.columns:
+            try:
+                cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum()
+            except:
+                cost = 0
+        else:
+            cost = 0
 
         st.metric("Impressions (TVQI Measured)", safe_format_number(impressions))
         st.metric("Completed Views", safe_format_number(completed_views))
