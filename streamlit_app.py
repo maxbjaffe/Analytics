@@ -15,7 +15,7 @@ def safe_format_number(val, as_int=True):
 # Upload CSV
 uploaded_file = st.file_uploader("Upload your report CSV", type=["csv"])
 
-# Function to auto-detect report type based on columns
+# Auto-detect report type based on unique columns
 def detect_report_type(columns):
     col_set = set(columns)
     if "player_completed_views" in col_set or "tv_quality_index_raw" in col_set:
@@ -38,10 +38,13 @@ if uploaded_file is not None:
         st.error("❌ The uploaded file is empty or unreadable. Please upload a valid CSV file.")
         st.stop()
 
-    # Clean columns
+    # Standardize column names
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
     df.dropna(how='all', inplace=True)
     df.dropna(axis=1, how='all', inplace=True)
+
+    # Optional: see the cleaned column names
+    # st.write("🧾 Columns:", df.columns.tolist())
 
     # Detect report type
     report_type = detect_report_type(df.columns)
@@ -51,11 +54,11 @@ if uploaded_file is not None:
     st.subheader("📈 Key Insights")
 
     if report_type == "TVQI Report":
-        impressions = df['impressions'].sum() if 'impressions' in df.columns else 0
+        impressions = df['tv_quality_index_measured_impressions'].sum() if 'tv_quality_index_measured_impressions' in df.columns else 0
         cost = df['advertiser_cost_(adv_currency)'].sum() if 'advertiser_cost_(adv_currency)' in df.columns else 0
         completed_views = df['player_completed_views'].sum() if 'player_completed_views' in df.columns else 0
 
-        st.metric("Impressions", safe_format_number(impressions))
+        st.metric("Impressions (TVQI Measured)", safe_format_number(impressions))
         st.metric("Completed Views", safe_format_number(completed_views))
         st.metric("Total Cost", f"${safe_format_number(cost, as_int=False)}")
 
