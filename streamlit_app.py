@@ -10,30 +10,19 @@ from pptx.util import Inches
 # === Page Setup ===
 st.set_page_config(page_title="TVQI Dashboard", layout="wide")
 
-# === Header Background Styling ===
+# === Inline Banner Image with Title ===
 st.markdown(
     """
-    <style>
-    .header-container {
-        position: relative;
-        height: 200px;
+    <div style="
         background-image: url('dashboard_header.png');
         background-size: cover;
         background-position: center;
-        opacity: 0.3;
-        margin-bottom: -120px;
-    }
-    .title-text {
-        position: relative;
-        text-align: center;
-        font-size: 40px;
-        font-weight: bold;
-        padding-top: 40px;
-        z-index: 2;
-    }
-    </style>
-    <div class="header-container"></div>
-    <div class="title-text">📊 TV Quality Index Dashboard</div>
+        height: 180px;
+        border-radius: 6px;
+        margin-bottom: -80px;
+        opacity: 0.6;">
+    </div>
+    <h1 style='text-align: center; font-size: 36px; margin-top: 30px;'>📊 TV Quality Index Dashboard</h1>
     """,
     unsafe_allow_html=True
 )
@@ -62,7 +51,7 @@ if uploaded_file:
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
     df.dropna(how="all", inplace=True)
 
-    # Apply mappings
+    # Apply mapping files
     df = apply_mapping(df, "supply_vendor", "vendor_mapping.csv")
     df = apply_mapping(df, "campaign", "campaign_mapping.csv")
     df = apply_mapping(df, "inventory_contract", "inventory_mapping.csv")
