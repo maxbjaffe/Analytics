@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -56,7 +57,8 @@ if uploaded_file is not None:
         completed_views = df['player_completed_views'].sum()
         player_starts = df['player_starts'].sum()
         viewable_impressions = df['sampled_viewed_impressions'].sum()
-        cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum()
+        df['advertiser_cost_(adv_currency)'] = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce')
+        cost = df['advertiser_cost_(adv_currency)'].sum()
         tvqi_raw = df['tv_quality_index_raw'].sum()
         tvqi_score = (tvqi_raw / impressions) if impressions > 0 else None
         cpm = (cost / impressions * 1000) if impressions > 0 else None
@@ -99,7 +101,6 @@ if uploaded_file is not None:
 
             filtered = grouped[grouped['supply_vendor'].isin(selected_vendors)]
 
-            # Combined Chart with Clean Y-axis
             fig, ax1 = plt.subplots(figsize=(10, 5))
             ax2 = ax1.twinx()
 
@@ -111,15 +112,13 @@ if uploaded_file is not None:
             ax1.set_title('Advertiser Cost + TVQI Score by Supply Vendor')
             ax1.tick_params(axis='x', rotation=45)
 
-            # Format Y-axis ticks as $
-            ax1.set_yticklabels([f"${int(t):,}" for t in ax1.get_yticks()])
-
+            # ✅ Clean Y-axis formatting
+            ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
             fig.tight_layout()
             st.pyplot(fig)
 
             # Export
             st.subheader("📤 Export Report")
-
             col_pdf, col_ppt = st.columns(2)
 
             with col_pdf:
