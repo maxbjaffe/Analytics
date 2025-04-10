@@ -44,7 +44,7 @@ uploaded_file = st.file_uploader("Upload your report CSV or Excel", type=["csv",
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith(".xlsx"):
-            df = pd.read_excel(uploaded_file, sheet_name="TV Quality Index Report_data")  # Correct sheet
+            df = pd.read_excel(uploaded_file, sheet_name="TV Quality Index Report_data")
         else:
             df = pd.read_csv(uploaded_file)
     except Exception as e:
@@ -55,7 +55,6 @@ if uploaded_file is not None:
     df.dropna(how='all', inplace=True)
     df.dropna(axis=1, how='all', inplace=True)
 
-    # Apply mapping
     df = apply_vendor_mapping(df)
 
     report_type = detect_report_type(df.columns)
@@ -95,66 +94,63 @@ if uploaded_file is not None:
         col8.metric("In-View Rate", f"{in_view_rate:.2%}" if in_view_rate else "N/A")
         col9.metric("TVQI Score", f"{tvqi_score:.4f}" if tvqi_score else "N/A")
 
-        st.subheader("📊 Top Supply Vendors: Advertiser Cost + TVQI Score")
+        # 📊 Compact dual visuals
+        st.subheader("📊 Top 10: Supply Vendor vs Inventory Contract")
+        chart_col1, chart_col2 = st.columns(2)
 
-        if 'supply_vendor' in df.columns:
-            grouped = df.groupby('supply_vendor').agg({
-                'advertiser_cost_(adv_currency)': 'sum',
-                'tv_quality_index_raw': 'sum',
-                'tv_quality_index_measured_impressions': 'sum'
-            }).reset_index()
+        # 🎯 CHART 1: Supply Vendor
+        with chart_col1:
+            if 'supply_vendor' in df.columns:
+                grouped = df.groupby('supply_vendor').agg({
+                    'advertiser_cost_(adv_currency)': 'sum',
+                    'tv_quality_index_raw': 'sum',
+                    'tv_quality_index_measured_impressions': 'sum'
+                }).reset_index()
 
-            grouped['tvqi_score'] = grouped['tv_quality_index_raw'] / grouped['tv_quality_index_measured_impressions']
-            grouped = grouped[grouped['tvqi_score'].notnull()]
-            grouped = grouped.sort_values(by='advertiser_cost_(adv_currency)', ascending=False)
+                grouped['tvqi_score'] = grouped['tv_quality_index_raw'] / grouped['tv_quality_index_measured_impressions']
+                grouped = grouped[grouped['tvqi_score'].notnull()]
+                grouped = grouped.sort_values(by='advertiser_cost_(adv_currency)', ascending=False).head(10)
 
-            all_vendors = grouped['supply_vendor'].tolist()
-            default_top_10 = all_vendors[:10]
-            selected_vendors = st.multiselect("Select supply vendors to show", all_vendors, default=default_top_10)
+                fig1, ax1 = plt.subplots(figsize=(7, 3.5))
+                ax2 = ax1.twinx()
 
-            filtered = grouped[grouped['supply_vendor'].isin(selected_vendors)]
+                ax1.bar(grouped['supply_vendor'], grouped['advertiser_cost_(adv_currency)'], color='lightgreen')
+                ax2.plot(grouped['supply_vendor'], grouped['tvqi_score'], color='blue', marker='o')
 
-            fig, ax1 = plt.subplots(figsize=(10, 5))
-            ax2 = ax1.twinx()
+                ax1.set_ylabel('Cost ($)', color='green')
+                ax2.set_ylabel('TVQI Score', color='blue')
+                ax1.set_title('By Supply Vendor', fontsize=12)
+                ax1.tick_params(axis='x', rotation=45)
+                ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+                fig1.tight_layout()
+                st.pyplot(fig1)
 
-            bars = ax1.bar(filtered['supply_vendor'], filtered['advertiser_cost_(adv_currency)'], color='lightgreen', label='Advertiser Cost')
-            ax2.plot(filtered['supply_vendor'], filtered['tvqi_score'], color='blue', marker='o', label='TVQI Score')
+        # 🎯 CHART 2: Inventory Contract
+        with chart_col2:
+            if 'inventory_contract' in df.columns:
+                contract_group = df.groupby('inventory_contract').agg({
+                    'advertiser_cost_(adv_currency)': 'sum',
+                    'tv_quality_index_raw': 'sum',
+                    'tv_quality_index_measured_impressions': 'sum'
+                }).reset_index()
 
-            ax1.set_ylabel('Advertiser Cost ($)', color='green')
-            ax2.set_ylabel('TVQI Score', color='blue')
-            ax1.set_title('Advertiser Cost + TVQI Score by Supply Vendor')
-            ax1.tick_params(axis='x', rotation=45)
-            ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
-            fig.tight_layout()
-            st.pyplot(fig)
+                contract_group['tvqi_score'] = contract_group['tv_quality_index_raw'] / contract_group['tv_quality_index_measured_impressions']
+                contract_group = contract_group[contract_group['tvqi_score'].notnull()]
+                contract_group = contract_group.sort_values(by='advertiser_cost_(adv_currency)', ascending=False).head(10)
 
-            st.subheader("📤 Export Report")
-            col_pdf, col_ppt = st.columns(2)
+                fig2, cx1 = plt.subplots(figsize=(7, 3.5))
+                cx2 = cx1.twinx()
 
-            with col_pdf:
-                if st.button("📄 Export Chart to PDF"):
-                    pdf_buf = io.BytesIO()
-                    fig.savefig(pdf_buf, format='pdf')
-                    st.download_button("Download PDF", pdf_buf.getvalue(), file_name="tvqi_chart.pdf", mime="application/pdf")
+                cx1.bar(contract_group['inventory_contract'], contract_group['advertiser_cost_(adv_currency)'], color='salmon')
+                cx2.plot(contract_group['inventory_contract'], contract_group['tvqi_score'], color='darkblue', marker='o')
 
-            with col_ppt:
-                if st.button("📊 Export Chart to PowerPoint"):
-                    ppt = Presentation()
-                    slide = ppt.slides.add_slide(ppt.slide_layouts[5])
-                    title = slide.shapes.title
-                    title.text = "TVQI Report Chart"
-
-                    image_stream = io.BytesIO()
-                    fig.savefig(image_stream, format='png')
-                    image_stream.seek(0)
-
-                    pic = slide.shapes.add_picture(image_stream, Inches(1), Inches(1.5), Inches(8), Inches(4.5))
-                    ppt_bytes = io.BytesIO()
-                    ppt.save(ppt_bytes)
-                    st.download_button("Download PPT", ppt_bytes.getvalue(), file_name="tvqi_chart.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-
-        else:
-            st.warning("⚠️ Supply Vendor data is missing.")
+                cx1.set_ylabel('Cost ($)', color='darkred')
+                cx2.set_ylabel('TVQI Score', color='darkblue')
+                cx1.set_title('By Inventory Contract', fontsize=12)
+                cx1.tick_params(axis='x', rotation=45)
+                cx1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
+                fig2.tight_layout()
+                st.pyplot(fig2)
 
 else:
     st.info("👈 Please upload a CSV or Excel file to get started.")
