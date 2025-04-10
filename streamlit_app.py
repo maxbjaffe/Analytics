@@ -7,16 +7,22 @@ from reportlab.pdfgen import canvas
 from pptx import Presentation
 from pptx.util import Inches
 
+# === Page Setup ===
 st.set_page_config(page_title="TVQI Dashboard", layout="wide")
+
+# === Header Image ===
+st.image("dashboard_header.png", use_column_width=True)
+
+# === Dashboard Title ===
 st.title("📊 TV Quality Index Dashboard")
 
+# === Utility Functions ===
 def safe_format_number(val, as_int=True):
     try:
         return f"{int(val):,}" if as_int else f"{float(val):,.2f}"
     except (ValueError, TypeError):
         return "N/A"
 
-# === Mapping Functions ===
 def apply_mapping(df, column, path):
     try:
         mapping_df = pd.read_csv(path)
@@ -34,7 +40,7 @@ if uploaded_file:
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
     df.dropna(how="all", inplace=True)
 
-    # Apply mapping files
+    # Apply mappings
     df = apply_mapping(df, "supply_vendor", "vendor_mapping.csv")
     df = apply_mapping(df, "campaign", "campaign_mapping.csv")
     df = apply_mapping(df, "inventory_contract", "inventory_mapping.csv")
@@ -75,7 +81,7 @@ if uploaded_file:
     col8.metric("In-View Rate", f"{in_view_rate:.2%}" if in_view_rate else "N/A")
     col9.metric("TVQI Score", f"{tvqi_score:.4f}" if tvqi_score else "N/A")
 
-    # === Side-by-side Charts ===
+    # === Charts ===
     st.subheader("📊 Top 10: Supply Vendor vs Inventory Contract")
     col_chart1, col_chart2 = st.columns(2)
 
@@ -123,7 +129,7 @@ if uploaded_file:
         fig2.tight_layout()
         st.pyplot(fig2)
 
-    # === Export Section ===
+    # === Export Buttons ===
     st.subheader("📤 Export Visuals")
     col_pdf, col_ppt = st.columns(2)
 
