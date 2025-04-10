@@ -10,11 +10,33 @@ from pptx.util import Inches
 # === Page Setup ===
 st.set_page_config(page_title="TVQI Dashboard", layout="wide")
 
-# === Header Image ===
-st.image("dashboard_header.png", use_column_width=True)
-
-# === Dashboard Title ===
-st.title("📊 TV Quality Index Dashboard")
+# === Header Background Styling ===
+st.markdown(
+    """
+    <style>
+    .header-container {
+        position: relative;
+        height: 200px;
+        background-image: url('dashboard_header.png');
+        background-size: cover;
+        background-position: center;
+        opacity: 0.3;
+        margin-bottom: -120px;
+    }
+    .title-text {
+        position: relative;
+        text-align: center;
+        font-size: 40px;
+        font-weight: bold;
+        padding-top: 40px;
+        z-index: 2;
+    }
+    </style>
+    <div class="header-container"></div>
+    <div class="title-text">📊 TV Quality Index Dashboard</div>
+    """,
+    unsafe_allow_html=True
+)
 
 # === Utility Functions ===
 def safe_format_number(val, as_int=True):
