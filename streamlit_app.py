@@ -93,29 +93,31 @@ if uploaded_file is not None:
             grouped = grouped[grouped['tvqi_score'].notnull()]
             grouped = grouped.sort_values(by='advertiser_cost_(adv_currency)', ascending=False)
 
-            # Filter
             all_vendors = grouped['supply_vendor'].tolist()
             default_top_10 = all_vendors[:10]
             selected_vendors = st.multiselect("Select supply vendors to show", all_vendors, default=default_top_10)
 
             filtered = grouped[grouped['supply_vendor'].isin(selected_vendors)]
 
-            # Combined Chart
+            # Combined Chart with Clean Y-axis
             fig, ax1 = plt.subplots(figsize=(10, 5))
             ax2 = ax1.twinx()
 
-            ax1.bar(filtered['supply_vendor'], filtered['advertiser_cost_(adv_currency)'], color='lightgreen', label='Advertiser Cost')
+            bars = ax1.bar(filtered['supply_vendor'], filtered['advertiser_cost_(adv_currency)'], color='lightgreen', label='Advertiser Cost')
             ax2.plot(filtered['supply_vendor'], filtered['tvqi_score'], color='blue', marker='o', label='TVQI Score')
 
             ax1.set_ylabel('Advertiser Cost ($)', color='green')
             ax2.set_ylabel('TVQI Score', color='blue')
             ax1.set_title('Advertiser Cost + TVQI Score by Supply Vendor')
             ax1.tick_params(axis='x', rotation=45)
-            fig.tight_layout()
 
+            # Format Y-axis ticks as $
+            ax1.set_yticklabels([f"${int(t):,}" for t in ax1.get_yticks()])
+
+            fig.tight_layout()
             st.pyplot(fig)
 
-            # Export Section
+            # Export
             st.subheader("📤 Export Report")
 
             col_pdf, col_ppt = st.columns(2)
