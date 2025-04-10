@@ -16,16 +16,17 @@ def safe_format_number(val, as_int=True):
     except (ValueError, TypeError):
         return "N/A"
 
-def apply_vendor_mapping(df, path="vendor_mapping.csv"):
+# === Mapping Functions ===
+def apply_mapping(df, column, path):
     try:
         mapping_df = pd.read_csv(path)
-        vendor_map = dict(zip(mapping_df["raw_name"], mapping_df["clean_name"]))
-        df["supply_vendor"] = df["supply_vendor"].replace(vendor_map)
+        name_map = dict(zip(mapping_df["raw_name"], mapping_df["clean_name"]))
+        df[column] = df[column].replace(name_map)
     except Exception as e:
-        st.warning(f"⚠️ Could not load vendor mapping: {e}")
+        st.warning(f"⚠️ Could not apply mapping for '{column}': {e}")
     return df
 
-# File uploader
+# === File Upload ===
 uploaded_file = st.file_uploader("Upload your TVQI Report CSV", type=["csv"])
 
 if uploaded_file:
@@ -33,14 +34,18 @@ if uploaded_file:
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
     df.dropna(how="all", inplace=True)
 
-    df = apply_vendor_mapping(df)
+    # Apply mapping files
+    df = apply_mapping(df, "supply_vendor", "vendor_mapping.csv")
+    df = apply_mapping(df, "campaign", "campaign_mapping.csv")
+    df = apply_mapping(df, "inventory_contract", "inventory_mapping.csv")
+
     df["advertiser_cost_(adv_currency)"] = pd.to_numeric(df["advertiser_cost_(adv_currency)"], errors="coerce")
     df["tvqi_score"] = df["tv_quality_index_raw"] / df["tv_quality_index_measured_impressions"]
 
     st.subheader("📁 Uploaded Data")
     st.dataframe(df)
 
-    # === METRICS ===
+    # === Summary Metrics ===
     st.subheader("📈 Summary Metrics")
     impressions = df["tv_quality_index_measured_impressions"].sum()
     completed_views = df["player_completed_views"].sum()
@@ -70,11 +75,11 @@ if uploaded_file:
     col8.metric("In-View Rate", f"{in_view_rate:.2%}" if in_view_rate else "N/A")
     col9.metric("TVQI Score", f"{tvqi_score:.4f}" if tvqi_score else "N/A")
 
-    # === CHARTS ===
+    # === Side-by-side Charts ===
     st.subheader("📊 Top 10: Supply Vendor vs Inventory Contract")
     col_chart1, col_chart2 = st.columns(2)
 
-    # Chart 1: Supply Vendor
+    # --- Supply Vendor Chart ---
     with col_chart1:
         vendor_group = df.groupby("supply_vendor").agg({
             "advertiser_cost_(adv_currency)": "sum",
@@ -88,7 +93,6 @@ if uploaded_file:
         ax2 = ax1.twinx()
         ax1.bar(vendor_group["supply_vendor"], vendor_group["advertiser_cost_(adv_currency)"], color="lightgreen")
         ax2.plot(vendor_group["supply_vendor"], vendor_group["tvqi_score"], color="blue", marker="o")
-
         ax1.set_ylabel("Advertiser Cost ($)", color="green")
         ax2.set_ylabel("TVQI Score", color="blue")
         ax1.set_title("By Supply Vendor", fontsize=12)
@@ -97,7 +101,7 @@ if uploaded_file:
         fig1.tight_layout()
         st.pyplot(fig1)
 
-    # Chart 2: Inventory Contract
+    # --- Inventory Contract Chart ---
     with col_chart2:
         contract_group = df.groupby("inventory_contract").agg({
             "advertiser_cost_(adv_currency)": "sum",
@@ -111,7 +115,6 @@ if uploaded_file:
         ax4 = ax3.twinx()
         ax3.bar(contract_group["inventory_contract"], contract_group["advertiser_cost_(adv_currency)"], color="salmon")
         ax4.plot(contract_group["inventory_contract"], contract_group["tvqi_score"], color="darkblue", marker="o")
-
         ax3.set_ylabel("Advertiser Cost ($)", color="darkred")
         ax4.set_ylabel("TVQI Score", color="darkblue")
         ax3.set_title("By Inventory Contract", fontsize=12)
@@ -120,7 +123,7 @@ if uploaded_file:
         fig2.tight_layout()
         st.pyplot(fig2)
 
-    # === EXPORT ===
+    # === Export Section ===
     st.subheader("📤 Export Visuals")
     col_pdf, col_ppt = st.columns(2)
 
