@@ -29,7 +29,6 @@ def detect_report_type(columns):
     else:
         return "Unknown Report"
 
-# Upload
 uploaded_file = st.file_uploader("Upload your report CSV or Excel", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
@@ -53,13 +52,12 @@ if uploaded_file is not None:
     if report_type == "TVQI Report":
         st.subheader("📈 Key Metrics")
 
-        impressions = df['tv_quality_index_measured_impressions'].sum() if 'tv_quality_index_measured_impressions' in df.columns else 0
-        completed_views = df['player_completed_views'].sum() if 'player_completed_views' in df.columns else 0
-        player_starts = df['player_starts'].sum() if 'player_starts' in df.columns else 0
-        viewable_impressions = df['sampled_viewed_impressions'].sum() if 'sampled_viewed_impressions' in df.columns else 0
-        cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum() if 'advertiser_cost_(adv_currency)' in df.columns else 0
-
-        tvqi_raw = df['tv_quality_index_raw'].sum() if 'tv_quality_index_raw' in df.columns else 0
+        impressions = df['tv_quality_index_measured_impressions'].sum()
+        completed_views = df['player_completed_views'].sum()
+        player_starts = df['player_starts'].sum()
+        viewable_impressions = df['sampled_viewed_impressions'].sum()
+        cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum()
+        tvqi_raw = df['tv_quality_index_raw'].sum()
         tvqi_score = (tvqi_raw / impressions) if impressions > 0 else None
         cpm = (cost / impressions * 1000) if impressions > 0 else None
         completion_rate = (completed_views / player_starts) if player_starts > 0 else None
@@ -74,16 +72,15 @@ if uploaded_file is not None:
 
         col4, col5, col6 = st.columns(3)
         col4.metric("CPM", f"${safe_format_number(cpm, as_int=False)}")
-        col5.metric("Completion Rate", f"{completion_rate:.2%}" if completion_rate is not None else "N/A")
+        col5.metric("Completion Rate", f"{completion_rate:.2%}" if completion_rate else "N/A")
         col6.metric("eCPCV", f"${safe_format_number(ecpcv, as_int=False)}")
 
         col7, col8, col9 = st.columns(3)
         col7.metric("Viewable CPM", f"${safe_format_number(viewable_cpm, as_int=False)}")
-        col8.metric("In-View Rate", f"{in_view_rate:.2%}" if in_view_rate is not None else "N/A")
-        col9.metric("TVQI Score", f"{tvqi_score:.4f}" if tvqi_score is not None else "N/A")
+        col8.metric("In-View Rate", f"{in_view_rate:.2%}" if in_view_rate else "N/A")
+        col9.metric("TVQI Score", f"{tvqi_score:.4f}" if tvqi_score else "N/A")
 
-        # Charts
-        st.subheader("📊 Breakdown by Supply Vendor")
+        st.subheader("📊 Top Supply Vendors: Advertiser Cost + TVQI Score")
 
         if 'supply_vendor' in df.columns:
             grouped = df.groupby('supply_vendor').agg({
@@ -91,61 +88,59 @@ if uploaded_file is not None:
                 'tv_quality_index_raw': 'sum',
                 'tv_quality_index_measured_impressions': 'sum'
             }).reset_index()
+
             grouped['tvqi_score'] = grouped['tv_quality_index_raw'] / grouped['tv_quality_index_measured_impressions']
-            grouped.sort_values(by='advertiser_cost_(adv_currency)', ascending=False, inplace=True)
+            grouped = grouped[grouped['tvqi_score'].notnull()]
+            grouped = grouped.sort_values(by='advertiser_cost_(adv_currency)', ascending=False)
 
-            # Chart 1
-            fig1, ax1 = plt.subplots(figsize=(10, 4))
-            ax1.barh(grouped['supply_vendor'], grouped['tvqi_score'], color='skyblue')
-            ax1.set_title("TVQI Score by Supply Vendor")
-            ax1.set_xlabel("TVQI Score")
-            ax1.invert_yaxis()
-            st.pyplot(fig1)
+            # Filter
+            all_vendors = grouped['supply_vendor'].tolist()
+            default_top_10 = all_vendors[:10]
+            selected_vendors = st.multiselect("Select supply vendors to show", all_vendors, default=default_top_10)
 
-            # Chart 2
-            fig2, ax2 = plt.subplots(figsize=(10, 4))
-            ax2.barh(grouped['supply_vendor'], grouped['advertiser_cost_(adv_currency)'], color='lightgreen')
-            ax2.set_title("Advertiser Cost by Supply Vendor")
-            ax2.set_xlabel("Total Cost ($)")
-            ax2.invert_yaxis()
-            st.pyplot(fig2)
+            filtered = grouped[grouped['supply_vendor'].isin(selected_vendors)]
 
-            # Export buttons
+            # Combined Chart
+            fig, ax1 = plt.subplots(figsize=(10, 5))
+            ax2 = ax1.twinx()
+
+            ax1.bar(filtered['supply_vendor'], filtered['advertiser_cost_(adv_currency)'], color='lightgreen', label='Advertiser Cost')
+            ax2.plot(filtered['supply_vendor'], filtered['tvqi_score'], color='blue', marker='o', label='TVQI Score')
+
+            ax1.set_ylabel('Advertiser Cost ($)', color='green')
+            ax2.set_ylabel('TVQI Score', color='blue')
+            ax1.set_title('Advertiser Cost + TVQI Score by Supply Vendor')
+            ax1.tick_params(axis='x', rotation=45)
+            fig.tight_layout()
+
+            st.pyplot(fig)
+
+            # Export Section
             st.subheader("📤 Export Report")
+
             col_pdf, col_ppt = st.columns(2)
 
             with col_pdf:
-                if st.button("📄 Export as PDF"):
-                    buf = io.BytesIO()
-                    c = canvas.Canvas(buf, pagesize=letter)
-                    c.drawString(100, 750, f"TVQI Score: {tvqi_score:.4f}" if tvqi_score else "TVQI Score: N/A")
-                    c.drawString(100, 730, f"Total Cost: ${cost:,.2f}")
-                    c.drawString(100, 710, f"CPM: ${cpm:,.2f}" if cpm else "CPM: N/A")
-                    c.drawString(100, 690, f"Completion Rate: {completion_rate:.2%}" if completion_rate else "N/A")
-                    c.drawString(100, 670, f"eCPCV: ${ecpcv:,.2f}" if ecpcv else "N/A")
-                    c.drawString(100, 650, f"Viewable CPM: ${viewable_cpm:,.2f}" if viewable_cpm else "N/A")
-                    c.save()
-                    st.download_button("Download PDF", buf.getvalue(), file_name="tvqi_report.pdf", mime="application/pdf")
+                if st.button("📄 Export Chart to PDF"):
+                    pdf_buf = io.BytesIO()
+                    fig.savefig(pdf_buf, format='pdf')
+                    st.download_button("Download PDF", pdf_buf.getvalue(), file_name="tvqi_chart.pdf", mime="application/pdf")
 
             with col_ppt:
-                if st.button("📊 Export as PowerPoint"):
+                if st.button("📊 Export Chart to PowerPoint"):
                     ppt = Presentation()
                     slide = ppt.slides.add_slide(ppt.slide_layouts[5])
                     title = slide.shapes.title
-                    title.text = "TVQI Report Summary"
+                    title.text = "TVQI Report Chart"
 
-                    textbox = slide.shapes.add_textbox(Inches(1), Inches(1.5), Inches(8), Inches(4))
-                    frame = textbox.text_frame
-                    frame.text = f"TVQI Score: {tvqi_score:.4f}" if tvqi_score else "TVQI Score: N/A"
-                    frame.add_paragraph().text = f"Total Cost: ${cost:,.2f}"
-                    frame.add_paragraph().text = f"CPM: ${cpm:,.2f}" if cpm else "CPM: N/A"
-                    frame.add_paragraph().text = f"Completion Rate: {completion_rate:.2%}" if completion_rate else "N/A"
-                    frame.add_paragraph().text = f"eCPCV: ${ecpcv:,.2f}" if ecpcv else "N/A"
-                    frame.add_paragraph().text = f"Viewable CPM: ${viewable_cpm:,.2f}" if viewable_cpm else "N/A"
+                    image_stream = io.BytesIO()
+                    fig.savefig(image_stream, format='png')
+                    image_stream.seek(0)
 
+                    pic = slide.shapes.add_picture(image_stream, Inches(1), Inches(1.5), Inches(8), Inches(4.5))
                     ppt_bytes = io.BytesIO()
                     ppt.save(ppt_bytes)
-                    st.download_button("Download PPT", ppt_bytes.getvalue(), file_name="tvqi_report.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+                    st.download_button("Download PPT", ppt_bytes.getvalue(), file_name="tvqi_chart.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
         else:
             st.warning("⚠️ Supply Vendor data is missing.")
