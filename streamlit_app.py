@@ -12,8 +12,8 @@ def safe_format_number(val, as_int=True):
     except (ValueError, TypeError):
         return "N/A"
 
-# Upload CSV
-uploaded_file = st.file_uploader("Upload your report CSV", type=["csv", "xlsx"])
+# Upload CSV or Excel
+uploaded_file = st.file_uploader("Upload your report CSV or Excel", type=["csv", "xlsx"])
 
 # Auto-detect report type
 def detect_report_type(columns):
@@ -60,10 +60,11 @@ if uploaded_file is not None:
         viewable_impressions = df['sampled_viewed_impressions'].sum() if 'sampled_viewed_impressions' in df.columns else 0
 
         # Clean and sum spend
-        if 'advertiser_cost_(adv_currency)' in df.columns:
-            cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum()
-        else:
-            cost = 0
+        cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum() if 'advertiser_cost_(adv_currency)' in df.columns else 0
+
+        # TVQI Score Fix: raw / measured impressions
+        tvqi_raw = df['tv_quality_index_raw'].sum() if 'tv_quality_index_raw' in df.columns else 0
+        tvqi_score = (tvqi_raw / impressions) if impressions > 0 else None
 
         # Calculated Metrics
         cpm = (cost / impressions * 1000) if impressions > 0 else None
@@ -71,7 +72,6 @@ if uploaded_file is not None:
         ecpcv = (cost / completed_views) if completed_views > 0 else None
         viewable_cpm = (cost / viewable_impressions * 1000) if viewable_impressions > 0 else None
         in_view_rate = (viewable_impressions / impressions) if impressions > 0 else None
-        tvqi_score = df['tv_quality_index_raw'].mean() if 'tv_quality_index_raw' in df.columns else None
 
         # Show Metrics
         col1, col2, col3 = st.columns(3)
