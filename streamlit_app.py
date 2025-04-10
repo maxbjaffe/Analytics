@@ -30,12 +30,21 @@ def detect_report_type(columns):
     else:
         return "Unknown Report"
 
+def apply_vendor_mapping(df, path="vendor_mapping.csv"):
+    try:
+        mapping_df = pd.read_csv(path)
+        vendor_map = dict(zip(mapping_df["raw_name"], mapping_df["clean_name"]))
+        df["supply_vendor"] = df["supply_vendor"].replace(vendor_map)
+    except Exception as e:
+        st.warning(f"⚠️ Could not load vendor mapping: {e}")
+    return df
+
 uploaded_file = st.file_uploader("Upload your report CSV or Excel", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith(".xlsx"):
-            df = pd.read_excel(uploaded_file, sheet_name="TV Quality Index Report_data")  # 🔧 Correct sheet
+            df = pd.read_excel(uploaded_file, sheet_name="TV Quality Index Report_data")  # Correct sheet
         else:
             df = pd.read_csv(uploaded_file)
     except Exception as e:
@@ -45,6 +54,9 @@ if uploaded_file is not None:
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
     df.dropna(how='all', inplace=True)
     df.dropna(axis=1, how='all', inplace=True)
+
+    # Apply mapping
+    df = apply_vendor_mapping(df)
 
     report_type = detect_report_type(df.columns)
     st.subheader(f"📁 Detected Report Type: `{report_type}`")
