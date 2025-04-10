@@ -35,7 +35,7 @@ uploaded_file = st.file_uploader("Upload your report CSV or Excel", type=["csv",
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith(".xlsx"):
-            df = pd.read_excel(uploaded_file, sheet_name=0)
+            df = pd.read_excel(uploaded_file, sheet_name="TV Quality Index Report_data")  # 🔧 Correct sheet
         else:
             df = pd.read_csv(uploaded_file)
     except Exception as e:
@@ -53,11 +53,12 @@ if uploaded_file is not None:
     if report_type == "TVQI Report":
         st.subheader("📈 Key Metrics")
 
+        df['advertiser_cost_(adv_currency)'] = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce')
+
         impressions = df['tv_quality_index_measured_impressions'].sum()
         completed_views = df['player_completed_views'].sum()
         player_starts = df['player_starts'].sum()
         viewable_impressions = df['sampled_viewed_impressions'].sum()
-        df['advertiser_cost_(adv_currency)'] = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce')
         cost = df['advertiser_cost_(adv_currency)'].sum()
         tvqi_raw = df['tv_quality_index_raw'].sum()
         tvqi_score = (tvqi_raw / impressions) if impressions > 0 else None
@@ -111,13 +112,10 @@ if uploaded_file is not None:
             ax2.set_ylabel('TVQI Score', color='blue')
             ax1.set_title('Advertiser Cost + TVQI Score by Supply Vendor')
             ax1.tick_params(axis='x', rotation=45)
-
-            # ✅ Clean Y-axis formatting
             ax1.yaxis.set_major_formatter(mtick.StrMethodFormatter('${x:,.0f}'))
             fig.tight_layout()
             st.pyplot(fig)
 
-            # Export
             st.subheader("📤 Export Report")
             col_pdf, col_ppt = st.columns(2)
 
