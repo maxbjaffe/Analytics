@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Ad Insights Auto-Dashboard", layout="wide")
 st.title("📊 Advertising Intelligence Dashboard")
 
-# Helper function to safely format numbers
+# Helper to safely format numbers
 def safe_format_number(val, as_int=True):
     try:
         return f"{int(val):,}" if as_int else f"{float(val):,.2f}"
@@ -13,9 +13,9 @@ def safe_format_number(val, as_int=True):
         return "N/A"
 
 # Upload CSV
-uploaded_file = st.file_uploader("Upload your report CSV", type=["csv"])
+uploaded_file = st.file_uploader("Upload your report CSV", type=["csv", "xlsx"])
 
-# Auto-detect report type based on unique columns
+# Auto-detect report type
 def detect_report_type(columns):
     col_set = set(columns)
     if "player_completed_views" in col_set or "tv_quality_index_raw" in col_set:
@@ -33,9 +33,12 @@ if uploaded_file is not None:
     st.write("Uploaded file:", uploaded_file.name)
 
     try:
-        df = pd.read_csv(uploaded_file)
-    except pd.errors.EmptyDataError:
-        st.error("❌ The uploaded file is empty or unreadable. Please upload a valid CSV file.")
+        if uploaded_file.name.endswith(".xlsx"):
+            df = pd.read_excel(uploaded_file, sheet_name=0)
+        else:
+            df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        st.error(f"❌ Could not read file: {e}")
         st.stop()
 
     # Standardize column names
@@ -53,19 +56,38 @@ if uploaded_file is not None:
     if report_type == "TVQI Report":
         impressions = df['tv_quality_index_measured_impressions'].sum() if 'tv_quality_index_measured_impressions' in df.columns else 0
         completed_views = df['player_completed_views'].sum() if 'player_completed_views' in df.columns else 0
+        player_starts = df['player_starts'].sum() if 'player_starts' in df.columns else 0
+        viewable_impressions = df['sampled_viewed_impressions'].sum() if 'sampled_viewed_impressions' in df.columns else 0
 
-        # Fix: make sure cost is numeric
+        # Clean and sum spend
         if 'advertiser_cost_(adv_currency)' in df.columns:
-            try:
-                cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum()
-            except:
-                cost = 0
+            cost = pd.to_numeric(df['advertiser_cost_(adv_currency)'], errors='coerce').sum()
         else:
             cost = 0
 
-        st.metric("Impressions (TVQI Measured)", safe_format_number(impressions))
-        st.metric("Completed Views", safe_format_number(completed_views))
-        st.metric("Total Cost", f"${safe_format_number(cost, as_int=False)}")
+        # Calculated Metrics
+        cpm = (cost / impressions * 1000) if impressions > 0 else None
+        completion_rate = (completed_views / player_starts) if player_starts > 0 else None
+        ecpcv = (cost / completed_views) if completed_views > 0 else None
+        viewable_cpm = (cost / viewable_impressions * 1000) if viewable_impressions > 0 else None
+        in_view_rate = (viewable_impressions / impressions) if impressions > 0 else None
+        tvqi_score = df['tv_quality_index_raw'].mean() if 'tv_quality_index_raw' in df.columns else None
+
+        # Show Metrics
+        col1, col2, col3 = st.columns(3)
+        col1.metric("TVQI Measured Impressions", safe_format_number(impressions))
+        col2.metric("Completed Views", safe_format_number(completed_views))
+        col3.metric("Total Cost", f"${safe_format_number(cost, as_int=False)}")
+
+        col4, col5, col6 = st.columns(3)
+        col4.metric("CPM", f"${safe_format_number(cpm, as_int=False)}")
+        col5.metric("Completion Rate", f"{completion_rate:.2%}" if completion_rate is not None else "N/A")
+        col6.metric("eCPCV", f"${safe_format_number(ecpcv, as_int=False)}")
+
+        col7, col8, col9 = st.columns(3)
+        col7.metric("Viewable CPM", f"${safe_format_number(viewable_cpm, as_int=False)}")
+        col8.metric("In-View Rate", f"{in_view_rate:.2%}" if in_view_rate is not None else "N/A")
+        col9.metric("TVQI Score", f"{tvqi_score:.4f}" if tvqi_score is not None else "N/A")
 
     elif report_type == "Campaign FC Savings":
         cost = df['advertiser_cost_(adv_currency)'].sum()
@@ -105,4 +127,4 @@ if uploaded_file is not None:
         st.warning("⚠️ Unknown report type. Displaying raw data only.")
 
 else:
-    st.info("👈 Please upload a CSV file to get started.")
+    st.info("👈 Please upload a CSV or Excel file to get started.")
